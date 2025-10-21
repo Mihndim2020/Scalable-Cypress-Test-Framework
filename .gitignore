@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/reports/
+cypress/downloads/
+
+# Test results
+test-results/
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+temp-rwa/
+tmp/
+.temp/
+
+# Build outputs
+dist/
+build/

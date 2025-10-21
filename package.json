@@ -1,0 +1,37 @@
+{
+  "name": "noveo-cypress-sample-project",
+  "version": "1.0.0",
+  "description": "Cypress E2E testing project based on Cypress Real World App",
+  "main": "index.js",
+  "scripts": {
+    "test:open": "cypress open",
+    "test:run": "cypress run",
+    "test:smoke": "cross-env TAGS='@smoke' cypress run",
+    "test:regression": "cross-env TAGS='@regression' cypress run",
+    "lint": "eslint 'src/**/*.js' --fix",
+    "format": "prettier --write 'src/**/*.{js,json}'",
+    "cypress:verify": "cypress verify",
+    "cypress:version": "cypress version"
+  },
+  "keywords": [
+    "cypress",
+    "e2e",
+    "testing",
+    "cucumber",
+    "bdd"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@badeball/cypress-cucumber-preprocessor": "^23.2.1",
+    "@bahmutov/cypress-esbuild-preprocessor": "^2.2.6",
+    "@cypress/browserify-preprocessor": "^3.0.2",
+    "cross-env": "^10.1.0",
+    "cypress": "^15.5.0",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.38.0",
+    "eslint-plugin-cypress": "^5.2.0",
+    "nyc": "^17.1.0",
+    "prettier": "^3.6.2"
+  }
+}
