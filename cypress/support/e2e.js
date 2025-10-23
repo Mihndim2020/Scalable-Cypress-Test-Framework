@@ -15,9 +15,11 @@
 
 // Import commands.js using ES2015 syntax:
 import './commands';
+import './allure';
 
 // Alternatively you can use CommonJS syntax:
 // require('./commands')
+// require('./allure')
 
 // Hide fetch/XHR requests from command log
 const app = window.top;

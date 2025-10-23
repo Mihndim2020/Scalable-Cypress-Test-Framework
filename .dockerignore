@@ -1,0 +1,45 @@
+# Node modules (will be installed in container)
+node_modules/
+npm-debug.log
+
+# Cypress cache and results
+cypress/screenshots/
+cypress/videos/
+cypress/results/
+cypress/reports/
+.cache/
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test artifacts
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log

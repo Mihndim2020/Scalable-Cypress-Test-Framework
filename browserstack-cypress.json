@@ -1,0 +1,103 @@
+{
+  "auth": {
+    "username": "${BROWSERSTACK_USERNAME}",
+    "access_key": "${BROWSERSTACK_ACCESS_KEY}"
+  },
+  "browsers": [
+    {
+      "browser": "chrome",
+      "os": "Windows 10",
+      "versions": ["latest", "latest - 1"]
+    },
+    {
+      "browser": "firefox",
+      "os": "Windows 10",
+      "versions": ["latest"]
+    },
+    {
+      "browser": "edge",
+      "os": "Windows 10",
+      "versions": ["latest"]
+    },
+    {
+      "browser": "chrome",
+      "os": "OS X Monterey",
+      "versions": ["latest"]
+    },
+    {
+      "browser": "safari",
+      "os": "OS X Monterey",
+      "versions": ["15.6"]
+    },
+    {
+      "browser": "safari",
+      "os": "OS X Ventura",
+      "versions": ["16.0"]
+    },
+    {
+      "device": "iPhone 14",
+      "os_version": "16",
+      "real_mobile": true
+    },
+    {
+      "device": "Samsung Galaxy S23",
+      "os_version": "13.0",
+      "real_mobile": true
+    }
+  ],
+  "run_settings": {
+    "cypress_config_file": "./cypress.config.js",
+    "cypress_version": "13",
+    "project_name": "Noveo Cypress Sample Project",
+    "build_name": "Build ${BUILD_NUMBER:-local}",
+    "parallels": 5,
+    "specs": [
+      "cypress/e2e/**/*.cy.js",
+      "src/tests/features/**/*.feature"
+    ],
+    "exclude_specs": [],
+    "npm_dependencies": {
+      "@badeball/cypress-cucumber-preprocessor": "^23.2.1",
+      "@bahmutov/cypress-esbuild-preprocessor": "^2.2.6"
+    },
+    "package_config_options": {},
+    "headless": true,
+    "record": false,
+    "reporter": "mochawesome",
+    "reporterOptions": {
+      "reportDir": "cypress/results",
+      "overwrite": false,
+      "html": false,
+      "json": true
+    }
+  },
+  "connection_settings": {
+    "local": true,
+    "local_identifier": "${LOCAL_IDENTIFIER:-local}",
+    "local_mode": "always-on",
+    "local_config_file": null
+  },
+  "disable_usage_reporting": false,
+  "downloads": {
+    "screenshots": true,
+    "videos": true,
+    "network_logs": true
+  },
+  "video_config": {
+    "upload_on_pass": false
+  },
+  "proxy": {
+    "http": null,
+    "https": null,
+    "bypass_list": []
+  },
+  "artifacts": {
+    "screenshots": "on-failure",
+    "videos": "always",
+    "logs": "always"
+  },
+  "timeout": {
+    "global": 900,
+    "spec": 600
+  }
+}

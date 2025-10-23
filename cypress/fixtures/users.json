@@ -1,17 +1,147 @@
 {
-  "validUser": {
-    "username": "testuser",
+  "standard": {
+    "id": "user-standard-001",
+    "username": "standard.user",
     "password": "Password123!",
-    "email": "testuser@example.com"
+    "email": "standard.user@example.com",
+    "firstName": "Standard",
+    "lastName": "User",
+    "role": "standard",
+    "permissions": ["read", "write"],
+    "status": "active",
+    "balance": 1000.00,
+    "phone": "+1-555-0101",
+    "address": {
+      "street": "123 Main St",
+      "city": "Anytown",
+      "state": "CA",
+      "zipCode": "12345",
+      "country": "USA"
+    }
+  },
+  "premium": {
+    "id": "user-premium-001",
+    "username": "premium.user",
+    "password": "Password123!",
+    "email": "premium.user@example.com",
+    "firstName": "Premium",
+    "lastName": "User",
+    "role": "premium",
+    "permissions": ["read", "write", "export"],
+    "status": "active",
+    "balance": 5000.00,
+    "phone": "+1-555-0102",
+    "address": {
+      "street": "456 Oak Ave",
+      "city": "Springfield",
+      "state": "NY",
+      "zipCode": "67890",
+      "country": "USA"
+    }
+  },
+  "admin": {
+    "id": "user-admin-001",
+    "username": "admin.user",
+    "password": "Admin123!",
+    "email": "admin.user@example.com",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": "admin",
+    "permissions": ["read", "write", "export", "delete", "admin"],
+    "status": "active",
+    "balance": 10000.00,
+    "phone": "+1-555-0103",
+    "address": {
+      "street": "789 Admin Blvd",
+      "city": "Capital City",
+      "state": "DC",
+      "zipCode": "20001",
+      "country": "USA"
+    }
+  },
+  "manager": {
+    "id": "user-manager-001",
+    "username": "manager.user",
+    "password": "Manager123!",
+    "email": "manager.user@example.com",
+    "firstName": "Manager",
+    "lastName": "User",
+    "role": "manager",
+    "permissions": ["read", "write", "export", "approve"],
+    "status": "active",
+    "balance": 7500.00,
+    "phone": "+1-555-0104",
+    "address": {
+      "street": "321 Manager Lane",
+      "city": "Metro City",
+      "state": "TX",
+      "zipCode": "75001",
+      "country": "USA"
+    }
+  },
+  "readonly": {
+    "id": "user-readonly-001",
+    "username": "readonly.user",
+    "password": "ReadOnly123!",
+    "email": "readonly.user@example.com",
+    "firstName": "ReadOnly",
+    "lastName": "User",
+    "role": "readonly",
+    "permissions": ["read"],
+    "status": "active",
+    "balance": 0.00,
+    "phone": "+1-555-0105",
+    "address": {
+      "street": "555 View St",
+      "city": "Observer Town",
+      "state": "CA",
+      "zipCode": "90001",
+      "country": "USA"
+    }
+  },
+  "suspended": {
+    "id": "user-suspended-001",
+    "username": "suspended.user",
+    "password": "Suspended123!",
+    "email": "suspended.user@example.com",
+    "firstName": "Suspended",
+    "lastName": "User",
+    "role": "standard",
+    "permissions": [],
+    "status": "suspended",
+    "balance": 250.00,
+    "phone": "+1-555-0106",
+    "address": {
+      "street": "999 Inactive Rd",
+      "city": "Frozen City",
+      "state": "AK",
+      "zipCode": "99501",
+      "country": "USA"
+    }
   },
   "invalidUser": {
-    "username": "invaliduser",
+    "username": "invalid.user",
     "password": "wrongpassword",
     "email": "invalid@example.com"
   },
-  "adminUser": {
-    "username": "admin",
-    "password": "Admin123!",
-    "email": "admin@example.com"
-  }
+  "testUsers": [
+    {
+      "username": "test.user.1",
+      "password": "Test123!",
+      "email": "test1@example.com",
+      "role": "standard"
+    },
+    {
+      "username": "test.user.2",
+      "password": "Test123!",
+      "email": "test2@example.com",
+      "role": "premium"
+    },
+    {
+      "username": "test.user.3",
+      "password": "Test123!",
+      "email": "test3@example.com",
+      "role": "admin"
+    }
+  ]
 }

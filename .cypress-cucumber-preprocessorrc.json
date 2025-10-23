@@ -1,7 +1,7 @@
 {
   "stepDefinitions": [
     "cypress/e2e/**/*.{js,ts}",
-    "src/tests/**/*.{js,ts}"
+    "src/tests/step-definitions/**/*.{js,ts}"
   ],
   "filterSpecs": true,
   "omitFiltered": true,
@@ -10,7 +10,8 @@
     "output": "cypress/reports/cucumber-json/cucumber-report.json"
   },
   "html": {
-    "enabled": true
+    "enabled": true,
+    "output": "cypress/reports/cucumber-html/cucumber-report.html"
   },
   "messages": {
     "enabled": true,

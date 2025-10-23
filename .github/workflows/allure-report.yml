@@ -1,0 +1,335 @@
+name: Allure Report with GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run nightly at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  CI: true
+  NODE_ENV: test
+
+jobs:
+  test-with-allure:
+    name: Run Tests and Generate Allure Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.cache/cypress
+          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          spec: 'cypress/e2e/**/*.cy.js'
+          config: baseUrl=${{ secrets.BASE_URL || 'http://localhost:3000' }}
+        env:
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+        continue-on-error: true
+
+      - name: Generate test metadata
+        if: always()
+        run: |
+          cat > test-metadata/run-metadata.json <<EOF
+          {
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "runId": "${{ github.run_id }}",
+            "runNumber": "${{ github.run_number }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "event": "${{ github.event_name }}",
+            "browser": "chrome",
+            "environment": "ci"
+          }
+          EOF
+
+      - name: Generate test metrics
+        if: always()
+        run: npm run report:metrics
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_number }}
+          path: allure-results
+          retention-days: 30
+
+      - name: Upload Allure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ github.run_number }}
+          path: allure-report
+          retention-days: 30
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots-${{ github.run_number }}
+          path: cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos-${{ github.run_number }}
+          path: cypress/videos
+          retention-days: 7
+
+      - name: Upload test metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-metrics-${{ github.run_number }}
+          path: test-metrics.json
+          retention-days: 90
+
+  generate-dashboard:
+    name: Generate Test Dashboard
+    needs: test-with-allure
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci --only=production
+
+      - name: Download test metrics
+        uses: actions/download-artifact@v4
+        with:
+          name: test-metrics-${{ github.run_number }}
+          path: .
+
+      - name: Generate dashboard
+        run: npm run report:dashboard
+
+      - name: Upload dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-dashboard-${{ github.run_number }}
+          path: dashboard
+          retention-days: 90
+
+  publish-to-pages:
+    name: Publish Reports to GitHub Pages
+    needs: [test-with-allure, generate-dashboard]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Allure report
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-report-${{ github.run_number }}
+          path: allure-report
+
+      - name: Download dashboard
+        uses: actions/download-artifact@v4
+        with:
+          name: test-dashboard-${{ github.run_number }}
+          path: dashboard
+
+      - name: Download test metrics
+        uses: actions/download-artifact@v4
+        with:
+          name: test-metrics-${{ github.run_number }}
+          path: metrics
+
+      - name: Create combined site
+        run: |
+          mkdir -p public
+          mkdir -p public/allure
+          mkdir -p public/dashboard
+          mkdir -p public/metrics
+
+          # Copy Allure report
+          cp -r allure-report/* public/allure/
+
+          # Copy dashboard
+          cp -r dashboard/* public/dashboard/
+
+          # Copy metrics
+          cp metrics/test-metrics.json public/metrics/
+
+          # Create index page
+          cat > public/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <meta http-equiv="refresh" content="0; url=dashboard/index.html">
+              <title>Test Reports</title>
+              <style>
+                  body {
+                      font-family: Arial, sans-serif;
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      height: 100vh;
+                      margin: 0;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                  }
+                  .container {
+                      text-align: center;
+                  }
+                  a {
+                      display: inline-block;
+                      margin: 10px;
+                      padding: 15px 30px;
+                      background: white;
+                      color: #667eea;
+                      text-decoration: none;
+                      border-radius: 5px;
+                      font-weight: bold;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Cypress Test Reports</h1>
+                  <p>Redirecting to dashboard...</p>
+                  <div>
+                      <a href="dashboard/index.html">Dashboard</a>
+                      <a href="allure/index.html">Allure Report</a>
+                      <a href="metrics/test-metrics.json">Metrics (JSON)</a>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment PR with report links
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = `## 📊 Test Reports Generated\n\n` +
+              `- 📈 [Test Dashboard](https://\${{ github.repository_owner }}.github.io/\${{ github.event.repository.name }}/dashboard/)\n` +
+              `- 📋 [Allure Report](https://\${{ github.repository_owner }}.github.io/\${{ github.event.repository.name }}/allure/)\n` +
+              `- 📄 [Metrics JSON](https://\${{ github.repository_owner }}.github.io/\${{ github.event.repository.name }}/metrics/test-metrics.json)\n\n` +
+              `**Build**: #\${{ github.run_number }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  publish-metrics-summary:
+    name: Publish Nightly Metrics Summary
+    needs: test-with-allure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download test metrics
+        uses: actions/download-artifact@v4
+        with:
+          name: test-metrics-${{ github.run_number }}
+          path: .
+
+      - name: Create metrics summary
+        run: |
+          # Extract key metrics
+          PASS_RATE=$(jq -r '.summary.passRate' test-metrics.json)
+          TOTAL_TESTS=$(jq -r '.summary.totalTests' test-metrics.json)
+          FAILED_TESTS=$(jq -r '.summary.failed' test-metrics.json)
+          FLAKY_TESTS=$(jq -r '.flakyTests | length' test-metrics.json)
+
+          # Create summary
+          cat > nightly-summary.md <<EOF
+          # 🌙 Nightly Test Summary - $(date +%Y-%m-%d)
+
+          ## Overview
+          - **Pass Rate**: ${PASS_RATE}%
+          - **Total Tests**: ${TOTAL_TESTS}
+          - **Failed Tests**: ${FAILED_TESTS}
+          - **Flaky Tests**: ${FLAKY_TESTS}
+
+          ## Details
+          - **Branch**: ${{ github.ref_name }}
+          - **Commit**: ${{ github.sha }}
+          - **Run**: #${{ github.run_number }}
+
+          [View Full Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dashboard/)
+          EOF
+
+      - name: Create GitHub Issue for nightly summary
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('nightly-summary.md', 'utf8');
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Nightly Test Summary - ${new Date().toISOString().split('T')[0]}`,
+              body: summary,
+              labels: ['automated-test', 'nightly-summary']
+            });

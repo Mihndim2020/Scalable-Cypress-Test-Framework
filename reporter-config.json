@@ -1,0 +1,25 @@
+{
+  "reporterEnabled": "mochawesome, mocha-junit-reporter",
+  "mochawesomeReporterOptions": {
+    "reportDir": "cypress/results",
+    "reportFilename": "[status]_[datetime]-[name]-report",
+    "timestamp": "longDate",
+    "overwrite": false,
+    "html": false,
+    "json": true,
+    "embeddedScreenshots": true,
+    "inlineAssets": true,
+    "saveJson": true,
+    "charts": true,
+    "code": true
+  },
+  "mochaJunitReporterReporterOptions": {
+    "mochaFile": "cypress/results/junit/results-[hash].xml",
+    "toConsole": false,
+    "outputs": true,
+    "testCaseSwitchClassnameAndName": false,
+    "suiteTitleSeparatedBy": " > ",
+    "useFullSuiteTitle": true,
+    "jenkinsMode": false
+  }
+}

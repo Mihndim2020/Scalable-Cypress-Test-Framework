@@ -1,0 +1,57 @@
+{
+  "description": "Custom test mapping rules for selective test execution",
+  "rules": [
+    {
+      "name": "Authentication changes",
+      "source": "src/auth/**",
+      "tests": [
+        "cypress/e2e/auth/**",
+        "cypress/e2e/login.cy.js",
+        "cypress/e2e/signup.cy.js",
+        "@smoke"
+      ]
+    },
+    {
+      "name": "API client changes",
+      "source": "src/api/**",
+      "tests": [
+        "cypress/e2e/api/**",
+        "@integration"
+      ]
+    },
+    {
+      "name": "Payment features",
+      "source": "src/payment/**",
+      "tests": [
+        "cypress/e2e/payment/**",
+        "cypress/e2e/checkout.cy.js"
+      ]
+    },
+    {
+      "name": "User profile changes",
+      "source": "src/profile/**",
+      "tests": [
+        "cypress/e2e/profile/**",
+        "cypress/e2e/settings.cy.js"
+      ]
+    },
+    {
+      "name": "Dashboard changes",
+      "source": "src/dashboard/**",
+      "tests": [
+        "cypress/e2e/dashboard/**"
+      ]
+    }
+  ],
+  "alwaysRun": [
+    "@smoke"
+  ],
+  "notes": [
+    "Source patterns support wildcards (**)",
+    "Test patterns can be:",
+    "  - Direct file paths: 'cypress/e2e/login.cy.js'",
+    "  - Glob patterns: 'cypress/e2e/auth/**'",
+    "  - Tags: '@smoke', '@regression', '@integration'",
+    "The 'alwaysRun' array specifies tests that run regardless of changes"
+  ]
+}

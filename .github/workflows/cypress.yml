@@ -1,0 +1,377 @@
+name: Cypress Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        type: choice
+        options:
+          - smoke
+          - regression
+          - full
+        default: 'smoke'
+
+env:
+  # Environment variables available to all jobs
+  CYPRESS_CACHE_FOLDER: ~/.cache/cypress
+  CI: true
+  NODE_ENV: test
+
+jobs:
+  # Job 1: Install dependencies and cache
+  install:
+    name: Install Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Cache Cypress binary
+        id: cache-cypress
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            cypress-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Verify Cypress
+        run: npx cypress verify
+
+  # Job 2: Smoke Tests (runs on all PRs and pushes)
+  smoke-tests:
+    name: Smoke Tests - ${{ matrix.browser }} (Node ${{ matrix.node }})
+    needs: install
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20']
+        browser: ['chrome', 'firefox', 'edge']
+        exclude:
+          # Run full matrix only on main branch, limited matrix on PRs
+          - node: '20'
+            browser: 'firefox'
+          - node: '20'
+            browser: 'edge'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Restore Cypress binary cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Start application (Docker Compose)
+        run: |
+          # Using Cypress RWA docker-compose for demo
+          # Replace with your actual app startup command
+          echo "Starting application..."
+          # docker-compose up -d
+          # Or use: npm start &
+          # For demo purposes, we'll assume app is already configured
+          echo "App would start here"
+
+      - name: Wait for application to be ready
+        run: |
+          # Wait for app to be healthy
+          # npx wait-on http://localhost:3000 -t 60000
+          echo "Waiting for app readiness..."
+
+      - name: Run Cypress smoke tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          spec: 'cypress/e2e/**/*.cy.js'
+          config: baseUrl=${{ secrets.BASE_URL || 'http://localhost:3000' }}
+          env: |
+            environment=ci,
+            API_URL=${{ secrets.API_URL || 'http://localhost:3001' }}
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Additional environment variables
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+
+      - name: Upload screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-videos-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/videos
+          retention-days: 7
+
+      - name: Generate HTML report
+        if: always()
+        run: |
+          # Install mochawesome if not in package.json
+          npm install --save-dev mochawesome mochawesome-merge mochawesome-report-generator || true
+          # Merge reports if multiple spec files
+          npx mochawesome-merge cypress/results/*.json > cypress/results/combined-report.json || true
+          npx marge cypress/results/combined-report.json --reportDir cypress/reports --inline || true
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-html-report-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/reports
+          retention-days: 14
+
+  # Job 3: Full Regression Tests (runs on main branch, nightly, or manual trigger)
+  regression-tests:
+    name: Regression - ${{ matrix.browser }} (Node ${{ matrix.node }})
+    needs: install
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.test_suite == 'regression')
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20']
+        browser: ['chrome', 'firefox', 'edge']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Restore Cypress binary cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Start application (Docker Compose)
+        run: |
+          echo "Starting application for regression tests..."
+          # docker-compose -f docker-compose.ci.yml up -d
+          echo "App would start here"
+
+      - name: Wait for application
+        run: |
+          # npx wait-on http://localhost:3000 -t 60000
+          echo "Waiting for app..."
+
+      - name: Run Cypress regression tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          spec: 'cypress/e2e/**/*.cy.js,src/tests/features/**/*.feature'
+          config: baseUrl=${{ secrets.BASE_URL || 'http://localhost:3000' }}
+          env: |
+            environment=ci,
+            API_URL=${{ secrets.API_URL || 'http://localhost:3001' }}
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+
+      - name: Upload screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-screenshots-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/screenshots
+          retention-days: 14
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-videos-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/videos
+          retention-days: 14
+
+      - name: Generate HTML report
+        if: always()
+        run: |
+          npm install --save-dev mochawesome mochawesome-merge mochawesome-report-generator || true
+          npx mochawesome-merge cypress/results/*.json > cypress/results/combined-report.json || true
+          npx marge cypress/results/combined-report.json --reportDir cypress/reports --inline || true
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-html-report-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/reports
+          retention-days: 30
+
+      - name: Upload test results for flaky detection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.browser }}-node${{ matrix.node }}-${{ github.run_number }}
+          path: cypress/results
+          retention-days: 30
+
+  # Job 4: Flaky Test Detection
+  flaky-detection:
+    name: Detect Flaky Tests
+    needs: [smoke-tests, regression-tests]
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-artifacts
+          pattern: test-results-*
+
+      - name: Run flaky test detector
+        run: |
+          node ci/flaky-test-detector.js --input test-artifacts --output flaky-report.json
+
+      - name: Upload flaky test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-test-report-${{ github.run_number }}
+          path: flaky-report.json
+          retention-days: 90
+
+      - name: Comment PR with flaky tests
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('flaky-report.json')) {
+              const report = JSON.parse(fs.readFileSync('flaky-report.json', 'utf8'));
+              if (report.flakyTests && report.flakyTests.length > 0) {
+                const comment = `## ⚠️ Flaky Tests Detected\n\n${report.summary}\n\nSee artifacts for full report.`;
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            }
+
+  # Job 5: Code Coverage Report
+  coverage:
+    name: Code Coverage
+    needs: regression-tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Generate coverage report
+        run: |
+          # If using nyc for code coverage
+          npx nyc report --reporter=html --reporter=text-summary || true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ github.run_number }}
+          path: coverage
+          retention-days: 30
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const coveragePath = 'coverage/coverage-summary.json';
+            if (fs.existsSync(coveragePath)) {
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+              const total = coverage.total;
+              const comment = `## 📊 Code Coverage\n\n` +
+                `- **Statements**: ${total.statements.pct}%\n` +
+                `- **Branches**: ${total.branches.pct}%\n` +
+                `- **Functions**: ${total.functions.pct}%\n` +
+                `- **Lines**: ${total.lines.pct}%`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }

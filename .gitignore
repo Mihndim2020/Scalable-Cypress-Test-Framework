@@ -2,10 +2,36 @@
 node_modules/
 package-lock.json
 
-# Environment variables
+# Environment variables (NEVER commit these!)
 .env
 .env.local
 .env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env-validation.json
+
+# Secrets and credentials
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+*.asc
+*.gpg
+
+# API keys and tokens
+.secrets
+.secrets.json
+secrets.json
+credentials.json
+service-account*.json
+
+# Test data with real credentials
+test-metadata/
+cypress/fixtures/real-users.json
 
 # Cypress
 cypress/videos/

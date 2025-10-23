@@ -1,0 +1,222 @@
+version: '3.8'
+
+services:
+  # Cypress test runner service
+  cypress:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-tests
+    environment:
+      # Application URLs
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+
+      # Test credentials
+      - TEST_USERNAME=${TEST_USERNAME:-testuser}
+      - TEST_PASSWORD=${TEST_PASSWORD:-testpassword}
+
+      # Cypress configuration
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - CYPRESS_VIDEO=${CYPRESS_VIDEO:-true}
+      - CYPRESS_SCREENSHOTS=${CYPRESS_SCREENSHOTS:-true}
+
+      # CI/Test environment
+      - CI=${CI:-false}
+      - NODE_ENV=test
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+
+      # BrowserStack (optional)
+      - BROWSERSTACK_USERNAME=${BROWSERSTACK_USERNAME}
+      - BROWSERSTACK_ACCESS_KEY=${BROWSERSTACK_ACCESS_KEY}
+    volumes:
+      # Mount source code for live updates during development
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+
+      # Mount results and artifacts to host for persistence
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - ./cypress/results:/app/cypress/results
+      - ./cypress/reports:/app/cypress/reports
+
+      # Cache node_modules and Cypress binary
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:run
+
+  # Cypress in headed mode (for debugging with X11)
+  cypress-headed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-headed
+    environment:
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - DISPLAY=${DISPLAY:-:99}
+      - CI=false
+    volumes:
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:open
+    profiles:
+      - headed
+
+  # Cypress for smoke tests only
+  cypress-smoke:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-smoke
+    environment:
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - TAGS=@smoke
+      - CI=true
+    volumes:
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - ./cypress/results:/app/cypress/results
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:smoke
+    profiles:
+      - smoke
+
+  # Cypress with specific browser
+  cypress-chrome:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-chrome
+    environment:
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - CI=true
+    volumes:
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:chrome
+    profiles:
+      - chrome
+
+  cypress-firefox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-firefox
+    environment:
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - CI=true
+    volumes:
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:firefox
+    profiles:
+      - firefox
+
+  cypress-edge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-edge
+    environment:
+      - BASE_URL=${BASE_URL:-http://app:3000}
+      - API_URL=${API_URL:-http://app:3001}
+      - CYPRESS_baseUrl=${BASE_URL:-http://app:3000}
+      - CI=true
+    volumes:
+      - ./cypress:/app/cypress
+      - ./src:/app/src
+      - ./cypress.config.js:/app/cypress.config.js
+      - ./cypress/screenshots:/app/cypress/screenshots
+      - ./cypress/videos:/app/cypress/videos
+      - cypress_cache:/root/.cache/cypress
+      - node_modules:/app/node_modules
+    networks:
+      - cypress-network
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npm run test:edge
+    profiles:
+      - edge
+
+  # Mock application service (replace with your actual app)
+  app:
+    image: nginx:alpine
+    container_name: cypress-app
+    ports:
+      - "3000:80"
+    volumes:
+      - ./scripts/mock-app:/usr/share/nginx/html:ro
+    networks:
+      - cypress-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  cypress_cache:
+    name: cypress_cache
+  node_modules:
+    name: cypress_node_modules
+
+networks:
+  cypress-network:
+    name: cypress-network
+    driver: bridge
