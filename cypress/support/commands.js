@@ -219,13 +219,13 @@ Cypress.Commands.add('waitForApi', (alias, timeout = 10000) => {
   cy.wait(`@${alias}`, { timeout });
 });
 
-/**
+/*
  * Intercept and mock API response
  * @param {string} method - HTTP method
  * @param {string} url - URL pattern
  * @param {Object} response - Mock response
  * @param {string} alias - Alias name
- * @example cy.mockApi('GET', '**/api/transactions', { data: [] }, 'getTransactions')
+ * @example
  */
 Cypress.Commands.add('mockApi', (method, url, response, alias) => {
   cy.intercept(method, url, response).as(alias);

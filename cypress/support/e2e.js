@@ -13,13 +13,9 @@
 // https://on.cypress.io/configuration
 // ***********************************************************
 
-// Import commands.js using ES2015 syntax:
-import './commands';
-import './allure';
-
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
-// require('./allure')
+// Import commands and Allure setup using ES module syntax
+import './commands.js';
+import './allure.js';
 
 // Hide fetch/XHR requests from command log
 const app = window.top;

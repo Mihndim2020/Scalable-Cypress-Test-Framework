@@ -3,6 +3,7 @@ const createBundler = require('@bahmutov/cypress-esbuild-preprocessor');
 const preprocessor = require('@badeball/cypress-cucumber-preprocessor');
 const createEsbuildPlugin = require('@badeball/cypress-cucumber-preprocessor/esbuild');
 const allureWriter = require('@shelex/cypress-allure-plugin/writer');
+const path = require('path');
 require('dotenv').config();
 
 module.exports = defineConfig({
@@ -17,7 +18,7 @@ module.exports = defineConfig({
     ],
 
     // Support file
-    supportFile: 'cypress/support/e2e.js',
+    supportFile: path.resolve(__dirname, 'cypress/support/e2e.js'),
 
     // Fixtures folder
     fixturesFolder: 'cypress/fixtures',

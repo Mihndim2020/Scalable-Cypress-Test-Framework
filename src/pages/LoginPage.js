@@ -1,4 +1,4 @@
-import BasePage from './BasePage';
+import BasePage from './BasePage.js';
 
 /**
  * Login Page Object Model
@@ -9,18 +9,21 @@ class LoginPage extends BasePage {
     super();
 
     // Page URL
-    this.url = '/login';
+    this.url = '/signin';
 
-    // Selectors
+    // Selectors - Based on actual page HTML structure
     this.selectors = {
-      usernameInput: '[data-test="username"]',
-      passwordInput: '[data-test="password"]',
+      // Input fields use data-test on the parent div, not the input itself
+      usernameContainer: '[data-test="signin-username"]',
+      usernameInput: '#username',
+      passwordContainer: '[data-test="signin-password"]',
+      passwordInput: '#password',
       submitButton: '[data-test="signin-submit"]',
       rememberMeCheckbox: '[data-test="signin-remember-me"]',
       errorMessage: '[data-test="signin-error"]',
       signupLink: '[data-test="signup"]',
-      forgotPasswordLink: '[data-test="forgot-password"]',
-      formTitle: '[data-test="signin-title"]',
+      // Note: Form title doesn't have data-test attribute, using h1 instead
+      formTitle: 'h1',
       loadingSpinner: '[data-test="loading-spinner"]',
       successMessage: '[data-test="success-message"]',
     };

@@ -12,7 +12,7 @@
  * - Key dashboard elements are visible
  */
 
-import { LoginPage, DashboardPage } from '../../src/pages';
+import { LoginPage, DashboardPage } from '../../src/pages/index.js';
 
 describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critical'] }, () => {
   let loginPage;

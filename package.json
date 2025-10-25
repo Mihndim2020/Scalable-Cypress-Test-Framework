@@ -2,6 +2,7 @@
   "name": "noveo-cypress-sample-project",
   "version": "1.0.0",
   "description": "Cypress E2E testing project based on Cypress Real World App",
+   "type": "module",
   "main": "index.js",
   "scripts": {
     "test:open": "cypress open",
