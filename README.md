@@ -1,6 +1,6 @@
-# Noveo Cypress Sample Project
+# Scalable Cypress Test Framework
 
-This is a Cypress E2E testing project based on the Cypress Real World App (RWA) structure. It implements a **modular test architecture** using Page Object Model (POM) and Behavior-Driven Development (BDD) with Cucumber.
+This is an enterprise-grade Cypress E2E testing framework based on the Cypress Real World App (RWA) structure. It implements a **modular test architecture** using Page Object Model (POM) and Behavior-Driven Development (BDD) with Cucumber.
 
 ## Features
 
@@ -45,7 +45,7 @@ This is a Cypress E2E testing project based on the Cypress Real World App (RWA) 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd Noveo-Cypress-Sample-Project
+cd Scalable-Cypress-Test-Framework
 ```
 
 2. Install dependencies:
@@ -63,7 +63,7 @@ cp .env.example .env
 ## Project Structure
 
 ```
-Noveo-Cypress-Sample-Project/
+Scalable-Cypress-Test-Framework/
 ├── cypress/
 │   ├── e2e/                           # E2E test files
 │   │   ├── *.cy.js                    # Standard Cypress tests (with POM)

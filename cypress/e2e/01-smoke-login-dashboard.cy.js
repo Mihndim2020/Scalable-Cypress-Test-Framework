@@ -82,7 +82,7 @@ describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critic
 
     // Get user info before refresh
     let userName;
-    cy.getByCy('user-name').invoke('text').then((text) => {
+    cy.getByCy('sidenav-username').invoke('text').then((text) => {
       userName = text;
     });
 
@@ -91,7 +91,7 @@ describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critic
 
     // Verify still logged in
     dashboardPage.verifyPageLoaded();
-    cy.getByCy('user-name').should('contain', userName);
+    cy.getByCy('sidenav-username').should('contain', userName);
   });
 
   afterEach(function() {
