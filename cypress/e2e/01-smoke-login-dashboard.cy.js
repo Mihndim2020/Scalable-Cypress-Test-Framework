@@ -32,8 +32,8 @@ describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critic
     // Step 2: Login with valid credentials
     cy.log('🔐 Step 2: Login with valid credentials');
     const testUser = {
-      username: Cypress.env('TEST_USERNAME') || 'testuser',
-      password: Cypress.env('TEST_PASSWORD') || 'Password123!'
+      username: Cypress.env('TEST_USERNAME') || 'mihndim2016@gmail.com',
+      password: Cypress.env('TEST_PASSWORD') || '0123456789'
     };
 
     loginPage.login(testUser.username, testUser.password);

@@ -188,7 +188,7 @@ class LoginPage extends BasePage {
    * @param {string} expectedUrl - Expected URL after login
    * @returns {LoginPage} LoginPage instance for chaining
    */
-  verifyLoginSuccess(expectedUrl = '/dashboard') {
+  verifyLoginSuccess(expectedUrl = '/') {
     this.verifyUrlContains(expectedUrl);
     return this;
   }

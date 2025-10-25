@@ -9,27 +9,52 @@ class DashboardPage extends BasePage {
     super();
 
     // Page URL
-    this.url = '/dashboard';
+    this.url = '/';
 
-    // Selectors
+    // Selectors - Based on actual dashboard HTML
     this.selectors = {
-      pageTitle: '[data-test="dashboard-title"]',
-      userGreeting: '[data-test="user-greeting"]',
-      logoutButton: '[data-test="sidenav-signout"]',
-      notificationBell: '[data-test="sidenav-notifications"]',
-      notificationBadge: '[data-test="notification-badge"]',
-      userAvatar: '[data-test="sidenav-user-avatar"]',
-      settingsButton: '[data-test="sidenav-user-settings"]',
-      mainContent: '[data-test="main-content"]',
+      // App branding
+      appNameLogo: '[data-test="app-name-logo"]',
+
+      // Top navigation
+      newTransactionButton: '[data-test="nav-top-new-transaction"]',
+      notificationsLink: '[data-test="nav-top-notifications-link"]',
+      notificationCount: '[data-test="nav-top-notifications-count"]',
+
+      // Navigation tabs
+      publicTab: '[data-test="nav-public-tab"]',
+      contactsTab: '[data-test="nav-contacts-tab"]',
+      personalTab: '[data-test="nav-personal-tab"]',
+
+      // Side navigation
       sideNav: '[data-test="sidenav"]',
-      searchInput: '[data-test="search-input"]',
-      createButton: '[data-test="create-button"]',
-      transactionsList: '[data-test="transaction-list"]',
-      transactionItem: '[data-test="transaction-item"]',
-      balanceDisplay: '[data-test="balance-display"]',
       menuButton: '[data-test="sidenav-toggle"]',
+      userFullName: '[data-test="sidenav-user-full-name"]',
+      username: '[data-test="sidenav-username"]',
+      userBalance: '[data-test="sidenav-user-balance"]',
       homeLink: '[data-test="sidenav-home"]',
-      accountLink: '[data-test="sidenav-user-account"]',
+      settingsButton: '[data-test="sidenav-user-settings"]',
+      bankAccountsLink: '[data-test="sidenav-bankaccounts"]',
+      notificationBell: '[data-test="sidenav-notifications"]',
+      logoutButton: '[data-test="sidenav-signout"]',
+
+      // Main content
+      mainContent: '[data-test="main"]',
+
+      // Transaction filters
+      dateRangeFilter: '[data-test="transaction-list-filter-date-range-button"]',
+      amountRangeFilter: '[data-test="transaction-list-filter-amount-range-button"]',
+
+      // Transactions list
+      transactionsList: '[data-test="transaction-list"]',
+      transactionItem: '[data-test^="transaction-item-"]',
+
+      // Backward compatibility aliases
+      pageTitle: '[data-test="app-name-logo"]',
+      userGreeting: '[data-test="sidenav-user-full-name"]',
+      balanceDisplay: '[data-test="sidenav-user-balance"]',
+      accountLink: '[data-test="sidenav-user-settings"]',
+      notificationBadge: '[data-test="nav-top-notifications-count"]',
       loadingSpinner: '[data-test="loading-spinner"]',
     };
   }
