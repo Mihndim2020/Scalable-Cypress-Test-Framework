@@ -1,0 +1,153 @@
+{
+  "standard": {
+    "id": "role-standard",
+    "name": "Standard User",
+    "level": 1,
+    "permissions": [
+      "user:read",
+      "user:update_own",
+      "transaction:create",
+      "transaction:read_own",
+      "profile:update_own"
+    ],
+    "features": {
+      "maxTransactionAmount": 1000,
+      "maxDailyTransactions": 10,
+      "canExportData": false,
+      "canViewReports": false,
+      "canAccessApi": false
+    },
+    "limits": {
+      "storageQuota": 1073741824,
+      "apiRateLimit": 100
+    }
+  },
+  "premium": {
+    "id": "role-premium",
+    "name": "Premium User",
+    "level": 2,
+    "permissions": [
+      "user:read",
+      "user:update_own",
+      "transaction:create",
+      "transaction:read_own",
+      "transaction:export",
+      "profile:update_own",
+      "report:view"
+    ],
+    "features": {
+      "maxTransactionAmount": 10000,
+      "maxDailyTransactions": 50,
+      "canExportData": true,
+      "canViewReports": true,
+      "canAccessApi": true
+    },
+    "limits": {
+      "storageQuota": 10737418240,
+      "apiRateLimit": 500
+    }
+  },
+  "manager": {
+    "id": "role-manager",
+    "name": "Manager",
+    "level": 3,
+    "permissions": [
+      "user:read",
+      "user:read_all",
+      "user:update_own",
+      "transaction:create",
+      "transaction:read_all",
+      "transaction:approve",
+      "transaction:export",
+      "profile:update_own",
+      "report:view",
+      "report:create"
+    ],
+    "features": {
+      "maxTransactionAmount": 50000,
+      "maxDailyTransactions": 200,
+      "canExportData": true,
+      "canViewReports": true,
+      "canAccessApi": true,
+      "canApproveTransactions": true
+    },
+    "limits": {
+      "storageQuota": 53687091200,
+      "apiRateLimit": 1000
+    }
+  },
+  "admin": {
+    "id": "role-admin",
+    "name": "Administrator",
+    "level": 4,
+    "permissions": [
+      "user:read",
+      "user:read_all",
+      "user:create",
+      "user:update",
+      "user:update_own",
+      "user:delete",
+      "transaction:create",
+      "transaction:read_all",
+      "transaction:approve",
+      "transaction:delete",
+      "transaction:export",
+      "profile:update_own",
+      "profile:update_all",
+      "report:view",
+      "report:create",
+      "report:delete",
+      "admin:settings",
+      "admin:audit_log"
+    ],
+    "features": {
+      "maxTransactionAmount": -1,
+      "maxDailyTransactions": -1,
+      "canExportData": true,
+      "canViewReports": true,
+      "canAccessApi": true,
+      "canApproveTransactions": true,
+      "canManageUsers": true,
+      "canAccessSettings": true
+    },
+    "limits": {
+      "storageQuota": -1,
+      "apiRateLimit": -1
+    }
+  },
+  "readonly": {
+    "id": "role-readonly",
+    "name": "Read Only User",
+    "level": 0,
+    "permissions": [
+      "user:read_own",
+      "transaction:read_own",
+      "profile:read_own"
+    ],
+    "features": {
+      "maxTransactionAmount": 0,
+      "maxDailyTransactions": 0,
+      "canExportData": false,
+      "canViewReports": false,
+      "canAccessApi": false
+    },
+    "limits": {
+      "storageQuota": 104857600,
+      "apiRateLimit": 50
+    }
+  },
+  "allRoles": [
+    "standard",
+    "premium",
+    "manager",
+    "admin",
+    "readonly"
+  ],
+  "roleHierarchy": {
+    "readonly": 0,
+    "standard": 1,
+    "premium": 2,
+    "manager": 3,
+    "admin": 4
+  }
+}

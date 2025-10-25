@@ -1,0 +1,454 @@
+name: Nightly Regression Tests
+
+on:
+  schedule:
+    # Run every night at 2 AM UTC (cron format: minute hour day month day-of-week)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test against'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - dev
+        default: 'staging'
+      parallel_runs:
+        description: 'Number of parallel runs'
+        required: false
+        type: number
+        default: 5
+
+env:
+  CI: true
+  NODE_ENV: test
+  CYPRESS_CACHE_FOLDER: ~/.cache/cypress
+
+jobs:
+  setup:
+    name: Setup Nightly Run
+    runs-on: ubuntu-latest
+    outputs:
+      test_environment: ${{ steps.set-env.outputs.environment }}
+      run_id: ${{ steps.set-env.outputs.run_id }}
+    steps:
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+          echo "run_id=nightly-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Notify start
+        run: |
+          echo "Starting nightly regression tests"
+          echo "Environment: ${{ steps.set-env.outputs.environment }}"
+          echo "Run ID: ${{ steps.set-env.outputs.run_id }}"
+
+  full-regression:
+    name: Full Regression - ${{ matrix.browser }} - Shard ${{ matrix.shard }}
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ['chrome', 'firefox', 'edge']
+        shard: [1, 2, 3, 4, 5]
+        node: ['18']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Cypress
+        run: npx cypress verify
+
+      - name: Start application
+        run: |
+          echo "Starting application for nightly tests..."
+          # docker-compose -f docker-compose.nightly.yml up -d
+          echo "App would start here"
+
+      - name: Run Cypress regression tests (sharded)
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          spec: 'cypress/e2e/**/*.cy.js,src/tests/features/**/*.feature'
+          config: baseUrl=${{ secrets.STAGING_BASE_URL || secrets.BASE_URL }}
+          # Sharding: run tests in parallel across multiple machines
+          record: true
+          parallel: true
+          group: 'Nightly-${{ matrix.browser }}'
+          ci-build-id: ${{ needs.setup.outputs.run_id }}
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+          CYPRESS_API_URL: ${{ secrets.STAGING_API_URL || secrets.API_URL }}
+          # Environment-specific variables
+          CYPRESS_ENVIRONMENT: ${{ needs.setup.outputs.test_environment }}
+
+      - name: Upload screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-screenshots-${{ matrix.browser }}-shard${{ matrix.shard }}-${{ github.run_number }}
+          path: cypress/screenshots
+          retention-days: 30
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-videos-${{ matrix.browser }}-shard${{ matrix.shard }}-${{ github.run_number }}
+          path: cypress/videos
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-results-${{ matrix.browser }}-shard${{ matrix.shard }}-${{ github.run_number }}
+          path: cypress/results
+          retention-days: 90
+
+  accessibility-tests:
+    name: Accessibility Tests (a11y)
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install --save-dev cypress-axe axe-core || true
+
+      - name: Run accessibility tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          spec: 'cypress/e2e/accessibility/**/*.cy.js'
+          config: baseUrl=${{ secrets.STAGING_BASE_URL || secrets.BASE_URL }}
+        env:
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+
+      - name: Upload a11y report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report-${{ github.run_number }}
+          path: cypress/reports/accessibility
+          retention-days: 30
+
+  performance-tests:
+    name: Performance Tests
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run performance tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          spec: 'cypress/e2e/performance/**/*.cy.js'
+          config: baseUrl=${{ secrets.STAGING_BASE_URL || secrets.BASE_URL }}
+        env:
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report-${{ github.run_number }}
+          path: cypress/reports/performance
+          retention-days: 30
+
+  visual-regression:
+    name: Visual Regression Tests
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install --save-dev @percy/cypress || true
+
+      - name: Run visual regression tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          spec: 'cypress/e2e/visual/**/*.cy.js'
+          config: baseUrl=${{ secrets.STAGING_BASE_URL || secrets.BASE_URL }}
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
+          CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
+
+      - name: Upload visual diff snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-${{ github.run_number }}
+          path: cypress/snapshots
+          retention-days: 30
+
+  report-generation:
+    name: Generate Nightly Report
+    needs: [full-regression, accessibility-tests, performance-tests, visual-regression]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: nightly-artifacts
+          pattern: nightly-results-*
+
+      - name: Install reporting dependencies
+        run: |
+          npm install --save-dev mochawesome mochawesome-merge mochawesome-report-generator
+          npm install --save-dev allure-commandline || true
+
+      - name: Merge test results
+        run: |
+          # Merge all mochawesome reports
+          npx mochawesome-merge "nightly-artifacts/**/cypress/results/*.json" > combined-report.json
+          npx marge combined-report.json --reportDir nightly-report --inline --reportTitle "Nightly Regression Report"
+
+      - name: Generate Allure report (optional)
+        run: |
+          # If using Allure
+          # npx allure generate nightly-artifacts --clean -o allure-report
+          echo "Allure report would be generated here"
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-full-report-${{ github.run_number }}
+          path: nightly-report
+          retention-days: 90
+
+      - name: Calculate test statistics
+        id: stats
+        run: |
+          # Calculate pass/fail statistics
+          TOTAL_TESTS=$(jq '[.stats.tests] | add' combined-report.json 2>/dev/null || echo "0")
+          PASSED_TESTS=$(jq '[.stats.passes] | add' combined-report.json 2>/dev/null || echo "0")
+          FAILED_TESTS=$(jq '[.stats.failures] | add' combined-report.json 2>/dev/null || echo "0")
+
+          echo "total=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED_TESTS" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED_TESTS" >> $GITHUB_OUTPUT
+
+      - name: Create summary report
+        run: |
+          cat > nightly-summary.md <<EOF
+          # 🌙 Nightly Regression Test Report
+
+          **Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')
+          **Build**: #${{ github.run_number }}
+          **Environment**: ${{ needs.setup.outputs.test_environment }}
+          **Run ID**: ${{ needs.setup.outputs.run_id }}
+
+          ## 📊 Test Statistics
+
+          - **Total Tests**: ${{ steps.stats.outputs.total }}
+          - **Passed**: ✅ ${{ steps.stats.outputs.passed }}
+          - **Failed**: ❌ ${{ steps.stats.outputs.failed }}
+          - **Pass Rate**: $(echo "scale=2; (${{ steps.stats.outputs.passed }} / ${{ steps.stats.outputs.total }}) * 100" | bc 2>/dev/null || echo "N/A")%
+
+          ## 🧪 Test Suites Executed
+
+          - ✅ Full Regression (Chrome, Firefox, Edge)
+          - ✅ Accessibility Tests
+          - ✅ Performance Tests
+          - ✅ Visual Regression Tests
+
+          ## 📦 Artifacts
+
+          - Screenshots (failures only)
+          - Test videos
+          - HTML reports
+          - Test results (JSON)
+
+          ---
+
+          **Workflow**: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-summary-${{ github.run_number }}
+          path: nightly-summary.md
+          retention-days: 90
+
+  flaky-detection:
+    name: Detect Flaky Tests (Nightly)
+    needs: [full-regression]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-artifacts
+          pattern: nightly-results-*
+
+      - name: Run flaky test detector
+        run: |
+          node ci/flaky-test-detector.js \
+            --input test-artifacts \
+            --output nightly-flaky-report.json \
+            --threshold 0.1 \
+            --min-runs 3
+
+      - name: Upload flaky test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-flaky-report-${{ github.run_number }}
+          path: nightly-flaky-report.json
+          retention-days: 90
+
+  notification:
+    name: Send Notifications
+    needs: [report-generation, flaky-detection]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download summary
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-summary-${{ github.run_number }}
+          path: .
+
+      - name: Create GitHub Issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let summary = 'Nightly regression tests failed.';
+            if (fs.existsSync('nightly-summary.md')) {
+              summary = fs.readFileSync('nightly-summary.md', 'utf8');
+            }
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `❌ Nightly Tests Failed - ${new Date().toISOString().split('T')[0]}`,
+              body: summary,
+              labels: ['automated-test', 'nightly-failure', 'bug']
+            });
+
+      - name: Send Slack notification (optional)
+        if: always()
+        run: |
+          # Example Slack notification
+          # Requires SLACK_WEBHOOK_URL secret
+          WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
+          if [ -n "$WEBHOOK_URL" ]; then
+            STATUS="${{ job.status }}"
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"Nightly tests completed with status: $STATUS\nView: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$WEBHOOK_URL"
+          fi
+          echo "Notification step completed"
+
+      - name: Send email notification (optional)
+        if: failure()
+        run: |
+          # Example email notification using GitHub API
+          echo "Email notification would be sent here"
+          # Could use sendgrid, AWS SES, or other email service

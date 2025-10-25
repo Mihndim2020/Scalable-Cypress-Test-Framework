@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env-validation.json
+
+# Secrets and credentials
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+*.asc
+*.gpg
+
+# API keys and tokens
+.secrets
+.secrets.json
+secrets.json
+credentials.json
+service-account*.json
+
+# Test data with real credentials
+test-metadata/
+cypress/fixtures/real-users.json
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/reports/
+cypress/downloads/
+
+# Test results
+test-results/
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+temp-rwa/
+tmp/
+.temp/
+
+# Build outputs
+dist/
+build/

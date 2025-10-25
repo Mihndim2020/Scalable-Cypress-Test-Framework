@@ -1,0 +1,292 @@
+name: BrowserStack Cross-Browser Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        type: choice
+        options:
+          - smoke
+          - regression
+        default: 'smoke'
+
+env:
+  CI: true
+  NODE_ENV: test
+  BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+  BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+
+jobs:
+  browserstack-tests:
+    name: BrowserStack - ${{ matrix.os }} - ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows configurations
+          - os: 'Windows 10'
+            browser: 'Chrome'
+            browser_version: 'latest'
+            resolution: '1920x1080'
+          - os: 'Windows 10'
+            browser: 'Firefox'
+            browser_version: 'latest'
+            resolution: '1920x1080'
+          - os: 'Windows 10'
+            browser: 'Edge'
+            browser_version: 'latest'
+            resolution: '1920x1080'
+          - os: 'Windows 11'
+            browser: 'Chrome'
+            browser_version: 'latest'
+            resolution: '1920x1080'
+
+          # macOS configurations
+          - os: 'OS X Monterey'
+            browser: 'Chrome'
+            browser_version: 'latest'
+            resolution: '1920x1080'
+          - os: 'OS X Monterey'
+            browser: 'Safari'
+            browser_version: '15.6'
+            resolution: '1920x1080'
+          - os: 'OS X Ventura'
+            browser: 'Safari'
+            browser_version: '16.0'
+            resolution: '1920x1080'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install BrowserStack Local binary
+        run: |
+          npm install -g browserstack-local
+          # Or use: wget https://www.browserstack.com/browserstack-local/BrowserStackLocal-linux-x64.zip
+
+      - name: Start BrowserStack Local tunnel
+        run: |
+          # Start BrowserStack Local for testing localhost apps
+          browserstack-local --key ${{ secrets.BROWSERSTACK_ACCESS_KEY }} --daemon start
+          echo "BrowserStack Local tunnel started"
+
+      - name: Wait for BrowserStack Local connection
+        run: |
+          # Wait for tunnel to be established
+          sleep 10
+          echo "Tunnel should be ready"
+
+      - name: Start application
+        run: |
+          # Start your application
+          # docker-compose up -d
+          # Or: npm start &
+          echo "Application would start here"
+
+      - name: Configure Cypress for BrowserStack
+        run: |
+          # Create BrowserStack config
+          cat > cypress.browserstack.json <<EOF
+          {
+            "auth": {
+              "username": "${{ secrets.BROWSERSTACK_USERNAME }}",
+              "access_key": "${{ secrets.BROWSERSTACK_ACCESS_KEY }}"
+            },
+            "browsers": [{
+              "browser": "${{ matrix.browser }}",
+              "browser_version": "${{ matrix.browser_version }}",
+              "os": "${{ matrix.os }}",
+              "os_version": "latest"
+            }],
+            "run_settings": {
+              "cypress_config_file": "./cypress.config.js",
+              "project_name": "Cypress Sample Project",
+              "build_name": "Build #${{ github.run_number }}",
+              "parallels": 5,
+              "npm_dependencies": {
+                "@badeball/cypress-cucumber-preprocessor": "^20.0.0"
+              }
+            },
+            "connection_settings": {
+              "local": true,
+              "local_identifier": "github-action-${{ github.run_id }}"
+            }
+          }
+          EOF
+
+      - name: Run Cypress tests on BrowserStack
+        run: |
+          # Using browserstack-cypress CLI
+          npx browserstack-cypress run --sync --config-file cypress.browserstack.json
+        env:
+          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          CYPRESS_BASE_URL: ${{ secrets.BASE_URL || 'http://localhost:3000' }}
+          CYPRESS_API_URL: ${{ secrets.API_URL || 'http://localhost:3001' }}
+
+      - name: Stop BrowserStack Local tunnel
+        if: always()
+        run: |
+          browserstack-local --key ${{ secrets.BROWSERSTACK_ACCESS_KEY }} --daemon stop
+          echo "BrowserStack Local tunnel stopped"
+
+      - name: Upload BrowserStack logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browserstack-logs-${{ matrix.os }}-${{ matrix.browser }}-${{ github.run_number }}
+          path: |
+            browserstack-*.log
+            cypress/results
+          retention-days: 14
+
+  browserstack-mobile:
+    name: BrowserStack Mobile - ${{ matrix.device }}
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # iOS devices
+          - device: 'iPhone 14'
+            os_version: '16'
+            browser: 'Safari'
+          - device: 'iPhone 13'
+            os_version: '15'
+            browser: 'Safari'
+
+          # Android devices
+          - device: 'Samsung Galaxy S23'
+            os_version: '13.0'
+            browser: 'Chrome'
+          - device: 'Google Pixel 7'
+            os_version: '13.0'
+            browser: 'Chrome'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Cypress for Mobile BrowserStack
+        run: |
+          cat > cypress.browserstack.mobile.json <<EOF
+          {
+            "auth": {
+              "username": "${{ secrets.BROWSERSTACK_USERNAME }}",
+              "access_key": "${{ secrets.BROWSERSTACK_ACCESS_KEY }}"
+            },
+            "browsers": [{
+              "browser": "${{ matrix.browser }}",
+              "device": "${{ matrix.device }}",
+              "os_version": "${{ matrix.os_version }}",
+              "real_mobile": true
+            }],
+            "run_settings": {
+              "cypress_config_file": "./cypress.config.js",
+              "project_name": "Cypress Mobile Tests",
+              "build_name": "Mobile Build #${{ github.run_number }}",
+              "specs": "cypress/e2e/mobile/**/*.cy.js"
+            }
+          }
+          EOF
+
+      - name: Run mobile tests on BrowserStack
+        run: |
+          npx browserstack-cypress run --sync --config-file cypress.browserstack.mobile.json
+        env:
+          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+
+  browserstack-report:
+    name: Generate BrowserStack Report
+    needs: [browserstack-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download all BrowserStack logs
+        uses: actions/download-artifact@v4
+        with:
+          path: browserstack-artifacts
+          pattern: browserstack-logs-*
+
+      - name: Generate consolidated report
+        run: |
+          # Create a summary report
+          echo "# BrowserStack Test Results" > browserstack-summary.md
+          echo "" >> browserstack-summary.md
+          echo "**Build**: #${{ github.run_number }}" >> browserstack-summary.md
+          echo "**Commit**: ${{ github.sha }}" >> browserstack-summary.md
+          echo "**Branch**: ${{ github.ref_name }}" >> browserstack-summary.md
+          echo "" >> browserstack-summary.md
+          echo "View full results: https://automate.browserstack.com/" >> browserstack-summary.md
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: browserstack-summary-${{ github.run_number }}
+          path: browserstack-summary.md
+          retention-days: 30
+
+      - name: Comment PR with BrowserStack results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('browserstack-summary.md')) {
+              const summary = fs.readFileSync('browserstack-summary.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }

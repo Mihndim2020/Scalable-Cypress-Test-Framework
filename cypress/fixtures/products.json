@@ -1,0 +1,168 @@
+{
+  "basic": {
+    "id": "prod-basic-001",
+    "sku": "BASIC-001",
+    "name": "Basic Widget",
+    "description": "A simple, reliable widget for everyday use",
+    "category": "widgets",
+    "price": 29.99,
+    "currency": "USD",
+    "stock": 100,
+    "status": "active",
+    "images": [
+      "https://example.com/images/basic-widget-1.jpg",
+      "https://example.com/images/basic-widget-2.jpg"
+    ],
+    "features": [
+      "Durable construction",
+      "Easy to use",
+      "1-year warranty"
+    ],
+    "dimensions": {
+      "length": 10,
+      "width": 5,
+      "height": 3,
+      "unit": "cm"
+    },
+    "weight": {
+      "value": 250,
+      "unit": "g"
+    }
+  },
+  "premium": {
+    "id": "prod-premium-001",
+    "sku": "PREMIUM-001",
+    "name": "Premium Widget Pro",
+    "description": "Advanced widget with premium features and superior build quality",
+    "category": "widgets",
+    "price": 99.99,
+    "currency": "USD",
+    "stock": 50,
+    "status": "active",
+    "images": [
+      "https://example.com/images/premium-widget-1.jpg",
+      "https://example.com/images/premium-widget-2.jpg",
+      "https://example.com/images/premium-widget-3.jpg"
+    ],
+    "features": [
+      "Premium materials",
+      "Advanced functionality",
+      "Lifetime warranty",
+      "Priority support"
+    ],
+    "dimensions": {
+      "length": 15,
+      "width": 8,
+      "height": 5,
+      "unit": "cm"
+    },
+    "weight": {
+      "value": 500,
+      "unit": "g"
+    }
+  },
+  "enterprise": {
+    "id": "prod-enterprise-001",
+    "sku": "ENTERPRISE-001",
+    "name": "Enterprise Solution",
+    "description": "Complete enterprise-grade solution with full support",
+    "category": "solutions",
+    "price": 999.99,
+    "currency": "USD",
+    "stock": 10,
+    "status": "active",
+    "images": [
+      "https://example.com/images/enterprise-1.jpg"
+    ],
+    "features": [
+      "Enterprise-grade security",
+      "24/7 dedicated support",
+      "Custom integration",
+      "Unlimited users",
+      "Advanced analytics"
+    ],
+    "dimensions": {
+      "length": 30,
+      "width": 20,
+      "height": 10,
+      "unit": "cm"
+    },
+    "weight": {
+      "value": 2000,
+      "unit": "g"
+    }
+  },
+  "outOfStock": {
+    "id": "prod-oos-001",
+    "sku": "OOS-001",
+    "name": "Out of Stock Item",
+    "description": "This product is currently unavailable",
+    "category": "widgets",
+    "price": 49.99,
+    "currency": "USD",
+    "stock": 0,
+    "status": "out_of_stock",
+    "images": [],
+    "features": [
+      "Coming soon"
+    ]
+  },
+  "discontinued": {
+    "id": "prod-disc-001",
+    "sku": "DISC-001",
+    "name": "Discontinued Product",
+    "description": "This product has been discontinued",
+    "category": "legacy",
+    "price": 19.99,
+    "currency": "USD",
+    "stock": 5,
+    "status": "discontinued",
+    "images": [],
+    "features": []
+  },
+  "testProducts": [
+    {
+      "id": "test-prod-1",
+      "name": "Test Product 1",
+      "price": 10.00,
+      "stock": 100
+    },
+    {
+      "id": "test-prod-2",
+      "name": "Test Product 2",
+      "price": 20.00,
+      "stock": 50
+    },
+    {
+      "id": "test-prod-3",
+      "name": "Test Product 3",
+      "price": 30.00,
+      "stock": 25
+    }
+  ],
+  "categories": [
+    "widgets",
+    "solutions",
+    "accessories",
+    "services",
+    "legacy"
+  ],
+  "priceRanges": {
+    "budget": {
+      "min": 0,
+      "max": 50
+    },
+    "midRange": {
+      "min": 50,
+      "max": 200
+    },
+    "premium": {
+      "min": 200,
+      "max": 1000
+    },
+    "enterprise": {
+      "min": 1000,
+      "max": 999999
+    }
+  }
+}

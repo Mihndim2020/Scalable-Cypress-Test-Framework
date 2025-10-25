@@ -1,0 +1,460 @@
+name: Parallel Test Execution
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      test_tag:
+        description: 'Test tag to run (@smoke, @regression, etc.)'
+        required: false
+        default: ''
+      shard_count:
+        description: 'Number of parallel shards'
+        required: false
+        default: '4'
+
+# Allow only one concurrent deployment per PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+jobs:
+  # ============================================
+  # Job 1: Setup and Test Collection
+  # ============================================
+  setup:
+    name: Setup & Collect Tests
+    runs-on: ubuntu-latest
+    outputs:
+      spec-list: ${{ steps.collect.outputs.spec-list }}
+      test-count: ${{ steps.collect.outputs.test-count }}
+      run-mode: ${{ steps.decide.outputs.run-mode }}
+      shard-count: ${{ steps.decide.outputs.shard-count }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for git diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Decide run mode
+        id: decide
+        run: |
+          # Determine if we should use selective or full run
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "run-mode=selective" >> $GITHUB_OUTPUT
+            echo "shard-count=${{ github.event.inputs.shard_count || '2' }}" >> $GITHUB_OUTPUT
+          else
+            echo "run-mode=full" >> $GITHUB_OUTPUT
+            echo "shard-count=${{ github.event.inputs.shard_count || '4' }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Collect tests
+        id: collect
+        run: |
+          # Generate test collection
+          node scripts/collect-tests.js
+
+          # Apply tag filter if specified
+          TAG_FILTER=""
+          if [[ -n "${{ github.event.inputs.test_tag }}" ]]; then
+            TAG_FILTER="--tag ${{ github.event.inputs.test_tag }}"
+          fi
+
+          # For PRs, use selective runner
+          if [[ "${{ steps.decide.outputs.run-mode }}" == "selective" ]]; then
+            echo "🎯 Running selective test detection..."
+            SPEC_OUTPUT=$(node scripts/selective-runner.js $TAG_FILTER)
+
+            # Extract spec list from output
+            SPEC_LIST=$(echo "$SPEC_OUTPUT" | sed -n '/--- SELECTIVE SPEC LIST START ---/,/--- SELECTIVE SPEC LIST END ---/p' | grep -v "---")
+
+            if [[ "$SPEC_LIST" == "ALL" ]] || [[ "$SPEC_LIST" == "SMOKE" ]]; then
+              # Run in normal mode with tag
+              if [[ "$SPEC_LIST" == "SMOKE" ]]; then
+                node scripts/collect-tests.js --tag @smoke
+              fi
+            fi
+          fi
+
+          # Count tests
+          TEST_COUNT=$(cat test-collection.json | jq '.totalTests')
+          echo "test-count=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "spec-list=test-collection.json" >> $GITHUB_OUTPUT
+
+      - name: Upload test collection
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-collection
+          path: |
+            test-collection.json
+            test-mapping.json
+          retention-days: 7
+
+  # ============================================
+  # Job 2: Run Tests in Parallel Shards
+  # ============================================
+  test-shards:
+    name: Test Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    needs: setup
+
+    strategy:
+      fail-fast: false  # Continue other shards even if one fails
+      matrix:
+        shard: [0, 1, 2, 3]  # 4 parallel workers
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Download test collection
+        uses: actions/download-artifact@v4
+        with:
+          name: test-collection
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Restore Cypress binary cache
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CYPRESS_CACHE_FOLDER }}
+          key: cypress-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            cypress-${{ runner.os }}-
+
+      - name: Verify Cypress
+        run: npx cypress verify
+
+      - name: Shard tests
+        id: shard
+        run: |
+          # Generate spec list for this shard
+          TOTAL_SHARDS=${{ needs.setup.outputs.shard-count }}
+          SHARD_INDEX=${{ matrix.shard }}
+
+          # Apply tag filter if specified
+          TAG_FILTER=""
+          if [[ -n "${{ github.event.inputs.test_tag }}" ]]; then
+            TAG_FILTER="--tag ${{ github.event.inputs.test_tag }}"
+          fi
+
+          # Only run shard if within shard count
+          if [[ $SHARD_INDEX -lt $TOTAL_SHARDS ]]; then
+            SHARD_OUTPUT=$(node scripts/shard-tests.js --total $TOTAL_SHARDS --index $SHARD_INDEX $TAG_FILTER --verbose)
+
+            # Extract spec list
+            SPEC_LIST=$(echo "$SHARD_OUTPUT" | sed -n '/--- SPEC LIST START ---/,/--- SPEC LIST END ---/p' | grep -v "---")
+
+            echo "spec-list=$SPEC_LIST" >> $GITHUB_OUTPUT
+            echo "has-tests=true" >> $GITHUB_OUTPUT
+
+            # Save for artifacts
+            echo "$SPEC_LIST" > shard-${{ matrix.shard }}-specs.txt
+          else
+            echo "has-tests=false" >> $GITHUB_OUTPUT
+            echo "Shard $SHARD_INDEX is beyond shard count $TOTAL_SHARDS, skipping"
+          fi
+
+      - name: Run Cypress tests
+        if: steps.shard.outputs.has-tests == 'true'
+        id: cypress-run
+        continue-on-error: true  # Allow retry on failure
+        uses: cypress-io/github-action@v6
+        with:
+          install: false  # Already installed
+          spec: ${{ steps.shard.outputs.spec-list }}
+          browser: chrome
+          headed: false
+          config: video=true,screenshotOnRunFailure=true
+        env:
+          CYPRESS_baseUrl: ${{ secrets.CYPRESS_BASE_URL || 'http://localhost:3000' }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Retry failed tests once
+      - name: Retry failed tests (Attempt 1)
+        if: steps.cypress-run.outcome == 'failure'
+        id: retry-1
+        continue-on-error: true
+        uses: cypress-io/github-action@v6
+        with:
+          install: false
+          spec: ${{ steps.shard.outputs.spec-list }}
+          browser: chrome
+          headed: false
+          config: video=true,screenshotOnRunFailure=true
+        env:
+          CYPRESS_baseUrl: ${{ secrets.CYPRESS_BASE_URL || 'http://localhost:3000' }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Final retry
+      - name: Retry failed tests (Attempt 2)
+        if: steps.retry-1.outcome == 'failure'
+        id: retry-2
+        uses: cypress-io/github-action@v6
+        with:
+          install: false
+          spec: ${{ steps.shard.outputs.spec-list }}
+          browser: chrome
+          headed: false
+          config: video=true,screenshotOnRunFailure=true
+        env:
+          CYPRESS_baseUrl: ${{ secrets.CYPRESS_BASE_URL || 'http://localhost:3000' }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record test outcome
+        if: always()
+        run: |
+          # Determine final outcome
+          if [[ "${{ steps.cypress-run.outcome }}" == "success" ]]; then
+            OUTCOME="passed"
+            ATTEMPTS=1
+          elif [[ "${{ steps.retry-1.outcome }}" == "success" ]]; then
+            OUTCOME="passed-retry-1"
+            ATTEMPTS=2
+          elif [[ "${{ steps.retry-2.outcome }}" == "success" ]]; then
+            OUTCOME="passed-retry-2"
+            ATTEMPTS=3
+          else
+            OUTCOME="failed"
+            ATTEMPTS=3
+          fi
+
+          # Save metadata
+          cat > shard-${{ matrix.shard }}-metadata.json << EOF
+          {
+            "shard": ${{ matrix.shard }},
+            "outcome": "$OUTCOME",
+            "attempts": $ATTEMPTS,
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run": "${{ github.run_id }}",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+
+      # Upload artifacts
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}-results
+          path: |
+            cypress/results/**/*
+            cypress/screenshots/**/*
+            cypress/videos/**/*
+            shard-${{ matrix.shard }}-*.json
+            shard-${{ matrix.shard }}-*.txt
+            mochawesome-report/**/*
+            allure-results/**/*
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ============================================
+  # Job 3: Aggregate Results
+  # ============================================
+  aggregate-results:
+    name: Aggregate Test Results
+    runs-on: ubuntu-latest
+    needs: [setup, test-shards]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Download all shard artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Aggregate test results
+        run: |
+          echo "📊 Aggregating test results from all shards..."
+
+          # Create aggregation directory
+          mkdir -p aggregated-results
+
+          # Merge all shard results
+          for shard in 0 1 2 3; do
+            if [[ -d "./artifacts/shard-${shard}-results" ]]; then
+              echo "Processing shard $shard..."
+
+              # Copy results
+              cp -r ./artifacts/shard-${shard}-results/* aggregated-results/ 2>/dev/null || true
+            fi
+          done
+
+          # Generate combined metrics
+          node scripts/generate-metrics.js --input aggregated-results --output test-metrics.json
+
+          # Generate dashboard
+          node scripts/generate-dashboard.js --input test-metrics.json --output test-dashboard.html
+
+      - name: Generate summary report
+        if: always()
+        run: |
+          echo "# 📊 Parallel Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow Run:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count shard outcomes
+          PASSED=0
+          PASSED_RETRY=0
+          FAILED=0
+
+          for shard in 0 1 2 3; do
+            if [[ -f "./artifacts/shard-${shard}-results/shard-${shard}-metadata.json" ]]; then
+              OUTCOME=$(cat "./artifacts/shard-${shard}-results/shard-${shard}-metadata.json" | jq -r '.outcome')
+              ATTEMPTS=$(cat "./artifacts/shard-${shard}-results/shard-${shard}-metadata.json" | jq -r '.attempts')
+
+              echo "- **Shard $shard:** $OUTCOME (${ATTEMPTS} attempt(s))" >> $GITHUB_STEP_SUMMARY
+
+              if [[ "$OUTCOME" == "passed" ]]; then
+                ((PASSED++))
+              elif [[ "$OUTCOME" =~ "passed-retry" ]]; then
+                ((PASSED_RETRY++))
+              else
+                ((FAILED++))
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Passed (first try): $PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Passed (after retry): $PASSED_RETRY" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
+
+          # Extract test metrics if available
+          if [[ -f "test-metrics.json" ]]; then
+            TOTAL_TESTS=$(cat test-metrics.json | jq -r '.summary.totalTests // 0')
+            PASS_RATE=$(cat test-metrics.json | jq -r '.summary.passRate // 0')
+            DURATION=$(cat test-metrics.json | jq -r '.summary.duration // 0')
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Test Metrics" >> $GITHUB_STEP_SUMMARY
+            echo "- Total Tests: $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
+            echo "- Pass Rate: ${PASS_RATE}%" >> $GITHUB_STEP_SUMMARY
+            echo "- Duration: ${DURATION}ms" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload aggregated results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aggregated-test-results
+          path: |
+            aggregated-results/**/*
+            test-metrics.json
+            test-dashboard.html
+          retention-days: 30
+
+      - name: Check test status
+        if: always()
+        run: |
+          # Fail the job if any shard failed after all retries
+          FAILED=0
+
+          for shard in 0 1 2 3; do
+            if [[ -f "./artifacts/shard-${shard}-results/shard-${shard}-metadata.json" ]]; then
+              OUTCOME=$(cat "./artifacts/shard-${shard}-results/shard-${shard}-metadata.json" | jq -r '.outcome')
+
+              if [[ "$OUTCOME" == "failed" ]]; then
+                echo "❌ Shard $shard failed after all retry attempts"
+                FAILED=1
+              fi
+            fi
+          done
+
+          if [[ $FAILED -eq 1 ]]; then
+            echo "::error::One or more test shards failed"
+            exit 1
+          fi
+
+          echo "✅ All test shards passed"
+
+  # ============================================
+  # Job 4: Publish Reports (Optional)
+  # ============================================
+  publish-reports:
+    name: Publish Test Reports
+    runs-on: ubuntu-latest
+    needs: aggregate-results
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download aggregated results
+        uses: actions/download-artifact@v4
+        with:
+          name: aggregated-test-results
+          path: ./reports
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './reports'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment on commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `📊 Test reports published: ${{ steps.deployment.outputs.page_url }}`
+            })
