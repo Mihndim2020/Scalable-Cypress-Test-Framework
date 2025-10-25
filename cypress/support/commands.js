@@ -10,6 +10,14 @@
  * @example cy.getByTestId('submit-button')
  */
 Cypress.Commands.add('getByTestId', (selector) => {
+  return cy.get(`[data-testid="${selector}"]`);
+});
+
+/**
+ * Custom command to get element by data-test attribute
+ * @example cy.getByTestId('submit-button')
+ */
+Cypress.Commands.add('getByTest', (selector) => {
   return cy.get(`[data-test="${selector}"]`);
 });
 

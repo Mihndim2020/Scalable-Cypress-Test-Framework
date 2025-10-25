@@ -27,9 +27,11 @@ class DashboardPage extends BasePage {
       personalTab: '[data-test="nav-personal-tab"]',
 
       // Side navigation
+      avatar: '[data-testid="PersonIcon"]',
+      navigationMenu: '[data-test="sidenav-home"]',
       sideNav: '[data-test="sidenav"]',
       menuButton: '[data-test="sidenav-toggle"]',
-      userFullName: '[data-test="sidenav-user-full-name"]',
+      userFullName: '["data-test="sidenav-user-full-name"]',
       username: '[data-test="sidenav-username"]',
       userBalance: '[data-test="sidenav-user-balance"]',
       homeLink: '[data-test="sidenav-home"]',
