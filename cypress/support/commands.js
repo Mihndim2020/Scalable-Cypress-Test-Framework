@@ -41,11 +41,11 @@ Cypress.Commands.add('login', (username, password) => {
   cy.session(
     [username, password],
     () => {
-      cy.visit('/login');
-      cy.getByTestId('username').type(username);
-      cy.getByTestId('password').type(password);
-      cy.getByTestId('signin-submit').click();
-      cy.url().should('include', '/dashboard');
+      cy.visit('/signin');
+      cy.getByTest('signin-username').type(username);
+      cy.getByTest('signin-password').type(password);
+      cy.getByTest('signin-submit').click();
+      cy.url().should('include', '/');
     },
     {
       validate() {

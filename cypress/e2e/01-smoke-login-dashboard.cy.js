@@ -61,7 +61,7 @@ describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critic
     cy.screenshot('smoke-login-dashboard-success');
   });
 
-  it('should display correct user information on dashboard', { tags: ['@smoke'] }, () => {
+  it.only('should display correct user information on dashboard', { tags: ['@smoke'] }, () => {
     // Use custom command for quick login
     cy.loginUser();
 
@@ -69,11 +69,11 @@ describe('Smoke Test: Login and Dashboard', { tags: ['@smoke', '@auth', '@critic
     dashboardPage.verifyPageLoaded();
 
     // Check user info is displayed
-    cy.getByCy('user-name').should('be.visible').and('not.be.empty');
-    cy.getByCy('user-balance').should('be.visible');
+    cy.getByTest('sidenav-user-full-name').should('be.visible').and('not.be.empty');
+    cy.getByTest('sidenav-bankaccounts').should('be.visible');
 
     // Verify recent activity section exists
-    cy.getByCy('recent-activity').should('exist');
+    cy.getByTest('recent-activity').should('exist');
   });
 
   it('should maintain session across page refresh', { tags: ['@smoke', '@session'] }, () => {

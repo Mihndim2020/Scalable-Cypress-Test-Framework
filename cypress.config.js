@@ -69,8 +69,8 @@ module.exports = defineConfig({
       apiUrl: process.env.API_URL || 'http://localhost:3001',
 
       // Test User Credentials
-      username: process.env.TEST_USERNAME || 'testuser',
-      password: process.env.TEST_PASSWORD || 'Password123!',
+      username: process.env.TEST_USERNAME || 'mihndim2016@gmail.com',
+      password: process.env.TEST_PASSWORD || '0123456789',
 
       // BDD Tags
       tags: process.env.TAGS || '',
